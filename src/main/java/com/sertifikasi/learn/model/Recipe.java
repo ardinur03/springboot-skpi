@@ -1,5 +1,7 @@
 package com.sertifikasi.learn.model;
 
+import java.sql.Timestamp;
+
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -10,7 +12,8 @@ import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.persistence.Temporal;
@@ -19,37 +22,49 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.sql.Timestamp;
-// import java.util.Set;
-import java.util.Set;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "users", schema = "public")
-@Builder
+@Table(name = "recipes", schema = "public")
 @EntityListeners(AuditingEntityListener.class)
-public class User implements java.io.Serializable {
-    private static final long serialVersionUID = -5894679636266655135L;
+public class Recipe implements java.io.Serializable {
+    private static final long serialVersionUID = 90177031282210259L;
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "generator_users_user_id_seq")
-    @SequenceGenerator(name = "generator_users_user_id_seq", sequenceName = "users_user_id_seq", schema = "public", allocationSize = 1)
-    @Column(name = "user_id", unique = true, nullable = false)
-    private int userId;
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "generator_recipes_recipe_id_seq")
+    @SequenceGenerator(name = "generator_recipes_recipe_id_seq", sequenceName = "recipes_recipe_id_seq", schema = "public", allocationSize = 1)
+    @Column(name = "recipe_id", unique = true, nullable = false)
+    private int recipeId;
 
-    @Column(name = "username")
-    private String username;
+    @ManyToOne
+    @JoinColumn(name = "category_id")
+    private Category categories;
 
-    @Column(name = "fullname")
-    private String fullname;
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User users;
 
-    @Column(name = "password")
-    private String password;
+    @ManyToOne
+    @JoinColumn(name = "level_id")
+    private Level levels;
 
-    @Column(name = "role")
-    private String role;
+    @Column(name = "recipe_name")
+    private String recipeName;
+
+    @Column(name = "image_filename")
+    private String imageFilename;
+
+    @Column(name = "time_cook")
+    private Integer timeCook;
+
+    @Column(name = "ingridient")
+    private String ingridient;
+
+    @Column(name = "how_to_cook")
+    private String howToCook;
 
     @Column(name = "is_deleted")
     private Boolean isDeleted;
@@ -70,9 +85,6 @@ public class User implements java.io.Serializable {
     @Column(name = "modified_time", length = 29)
     private Timestamp modifiedTime;
 
-    @OneToMany(mappedBy = "users")
-    private Set<Recipe> recipes;
-
-    // @OneToMany(mappedBy = "users")
+    // @OneToMany(mappedBy = "recipes")
     // private Set<FavoriteFoods> favoriteFoodses;
 }

@@ -30,92 +30,94 @@ import java.util.Set;
 @Service
 public class UserService {
 
-    @Autowired
-    private UserRepository userRepository;
+        @Autowired
+        private UserRepository userRepository;
 
-    @Autowired
-    private Validator validator;
+        @Autowired
+        private Validator validator;
 
-    @Autowired
-    private MessageUtil messageUtil;
+        @Autowired
+        private MessageUtil messageUtil;
 
-    @Autowired
-    AuthenticationManager authenticationManager;
+        @Autowired
+        AuthenticationManager authenticationManager;
 
-    @Autowired
-    JwtUtil jwtUtil;
+        @Autowired
+        JwtUtil jwtUtil;
 
-    final HttpStatus statusOK = HttpStatus.OK;
+        final HttpStatus statusOK = HttpStatus.OK;
 
-    @Transactional
-    public ApiResponse register(RegisterRequest request) {
-        Set<ConstraintViolation<RegisterRequest>> constraintViolations = validator.validate(request);
-        if (!constraintViolations.isEmpty()) {
-            ConstraintViolation<RegisterRequest> firstViolation = constraintViolations.iterator().next();
-            return new ApiResponse(firstViolation.getMessage(), HttpStatus.BAD_REQUEST.value(), "ERROR");
+        @Transactional
+        public ApiResponse register(RegisterRequest request) {
+                Set<ConstraintViolation<RegisterRequest>> constraintViolations = validator.validate(request);
+                if (!constraintViolations.isEmpty()) {
+                        ConstraintViolation<RegisterRequest> firstViolation = constraintViolations.iterator().next();
+                        return new ApiResponse(firstViolation.getMessage(), HttpStatus.BAD_REQUEST.value(), "ERROR");
+                }
+
+                if (userRepository.existsByUsername(request.getUsername())) {
+                        return new ApiResponse(messageUtil.get("message.error.already-exist.user"),
+                                        HttpStatus.BAD_REQUEST.value(),
+                                        "ERROR");
+                }
+
+                if (!request.getPassword().equals(request.getRetypePassword())) {
+                        return new ApiResponse(messageUtil.get("message.error.password-not-match.user"),
+                                        HttpStatus.BAD_REQUEST.value(), "ERROR");
+                }
+
+                if (request.getPassword().length() < 6) {
+                        return new ApiResponse(messageUtil.get("message.error.password-validation.user"),
+                                        HttpStatus.BAD_REQUEST.value(), "ERROR");
+                }
+
+                User user = User.builder()
+                                .username(request.getUsername())
+                                .fullname(request.getFullname())
+                                .password(BCrypt.hashpw(request.getPassword(), BCrypt.gensalt()))
+                                .role("User")
+                                .isDeleted(false)
+                                .build();
+
+                userRepository.save(user);
+                return new ApiResponse(messageUtil.get("message.success.registered.user", request.getUsername()),
+                                HttpStatus.OK.value(), "OK");
         }
 
-        if (userRepository.existsByUsername(request.getUsername())) {
-            return new ApiResponse(messageUtil.get("message.error.already-exist.user"), HttpStatus.BAD_REQUEST.value(),
-                    "ERROR");
+        public ApiSignInResponseBuilder signIn(LoginRequest loginRequest) {
+                try {
+                        Authentication authentication = authenticationManager.authenticate(
+                                        new UsernamePasswordAuthenticationToken(loginRequest.getUsername(),
+                                                        loginRequest.getPassword()));
+
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                        String jwt = jwtUtil.generateJwtToken(authentication);
+
+                        UserDetailsImplement userDetails = (UserDetailsImplement) authentication.getPrincipal();
+                        Optional<String> roles = userDetails.getAuthorities().stream()
+                                        .map(item -> item.getAuthority())
+                                        .findFirst();
+
+                        return ApiSignInResponseBuilder.builder()
+                                        .data(new JwtResponse(jwt, userDetails.getId(), userDetails.getUsername(),
+                                                        roles.get()))
+                                        .message(messageUtil.get("message.success.auth.user"))
+                                        .statusCode(statusOK.value())
+                                        .status(statusOK)
+                                        .build();
+
+                } catch (AuthenticationException e) {
+                        return ApiSignInResponseBuilder.builder()
+                                        .message(messageUtil.get("message.error.auth.user"))
+                                        .statusCode(HttpStatus.UNAUTHORIZED.value())
+                                        .status(HttpStatus.UNAUTHORIZED)
+                                        .build();
+                } catch (Exception e) {
+                        return ApiSignInResponseBuilder.builder()
+                                        .message(messageUtil.get("message.error.internal.server.error"))
+                                        .statusCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                                        .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                        .build();
+                }
         }
-
-        if (!request.getPassword().equals(request.getRetypePassword())) {
-            return new ApiResponse(messageUtil.get("message.error.password-not-match.user"),
-                    HttpStatus.BAD_REQUEST.value(), "ERROR");
-        }
-
-        if (request.getPassword().length() < 6) {
-            return new ApiResponse(messageUtil.get("message.error.password-validation.user"),
-                    HttpStatus.BAD_REQUEST.value(), "ERROR");
-        }
-
-        User user = User.builder()
-                .username(request.getUsername())
-                .fullname(request.getFullname())
-                .password(BCrypt.hashpw(request.getPassword(), BCrypt.gensalt()))
-                .role("User")
-                .isDeleted(false)
-                .build();
-
-        userRepository.save(user);
-        return new ApiResponse(messageUtil.get("message.success.registered.user", request.getUsername()),
-                HttpStatus.OK.value(), "OK");
-    }
-
-    public ApiSignInResponseBuilder signIn(LoginRequest loginRequest) {
-        try {
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
-
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            String jwt = jwtUtil.generateJwtToken(authentication);
-
-            UserDetailsImplement userDetails = (UserDetailsImplement) authentication.getPrincipal();
-            Optional<String> roles = userDetails.getAuthorities().stream()
-                    .map(item -> item.getAuthority())
-                    .findFirst();
-
-            return ApiSignInResponseBuilder.builder()
-                    .data(new JwtResponse(jwt, userDetails.getId(), userDetails.getUsername(),
-                            roles.get()))
-                    .message(messageUtil.get("message.success.auth.user"))
-                    .statusCode(statusOK.value())
-                    .status(statusOK)
-                    .build();
-
-        } catch (AuthenticationException e) {
-            return ApiSignInResponseBuilder.builder()
-                    .message(messageUtil.get("message.error.auth.user"))
-                    .statusCode(HttpStatus.UNAUTHORIZED.value())
-                    .status(HttpStatus.UNAUTHORIZED)
-                    .build();
-        } catch (Exception e) {
-            return ApiSignInResponseBuilder.builder()
-                    .message(messageUtil.get("message.error.internal.server.error"))
-                    .statusCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .build();
-        }
-    }
 }
